@@ -1,0 +1,56 @@
+name: Build Saino (Windows)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  MAIN_SCRIPT: 'main.py'
+  DIST_DIR: 'dist'
+
+jobs:
+  build-nuitka:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install nuitka==1.9.17 pywin32 requests PySide6
+          # نسخهٔ nuitka را چک کنید و به‌روز کنید در صورت نیاز
+
+      - name: Build with Nuitka (standalone + onefile attempt)
+        shell: powershell
+        run: |
+          mkdir -Force ${{ env.DIST_DIR }}
+          # توجه: ساخت onefile با PySide6 ممکن است پیچیده باشد.
+          # این دستور تلاش برای ساخت یک exe واحد می‌کند. اگر با مشکل مواجه شدید،
+          # از حالت standalone بدون --onefile استفاده کنید (همان پوشه خروجی).
+          python -m nuitka `
+            --standalone `
+            --onefile `
+            --follow-imports `
+            --enable-plugin=pyside6 `
+            --include-qt-plugins=platforms,styles `
+            --windows-disable-console `
+            --remove-output `
+            --output-dir=${{ env.DIST_DIR }} `
+            ${{ env.MAIN_SCRIPT }} --assume-yes-for-downloads
+
+      - name: List dist
+        run: dir dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: saino-build
+          path: dist/*
